@@ -99,7 +99,7 @@ class KeyboardPanel:
         menu = Gtk.Menu()
         
         # Заголовок с текущей раскладкой
-        current_item = Gtk.MenuItem(f"Текущая: {self.current_layout.upper()}")
+        current_item = Gtk.MenuItem("Текущая: {}".format(self.current_layout.upper()))
         current_item.set_sensitive(False)
         menu.append(current_item)
         
@@ -110,7 +110,7 @@ class KeyboardPanel:
         # Пункты для каждой доступной раскладки
         for layout in self.layouts:
             layout_name = self.get_layout_name(layout)
-            item = Gtk.MenuItem(f"Переключить на {layout_name}")
+            item = Gtk.MenuItem("Переключить на {}".format(layout_name))
             item.connect('activate', self.on_layout_selected, layout)
             menu.append(item)
         
@@ -195,7 +195,7 @@ def main():
         panel = KeyboardPanel()
         panel.run()
     except Exception as e:
-        print(f"Ошибка при запуске: {e}")
+        print("Ошибка при запуске: {}".format(e))
         sys.exit(1)
 
 if __name__ == '__main__':
