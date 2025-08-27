@@ -27,15 +27,30 @@ fi
 echo "📦 Установка зависимостей..."
 if [ "$INSTALL_TYPE" = "system" ]; then
     apt-get update
-    apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
+    # Пробуем новый пакет
+    if ! apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1; then
+        echo "⚠️  Пробуем старый пакет AppIndicator3..."
+        apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
+    fi
 else
     echo "Для установки зависимостей выполните:"
+    echo "sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1"
+    echo "Или для старых версий:"
     echo "sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1"
     
     # Проверяем зависимости
-    if ! python3 -c "import gi; gi.require_version('Gtk', '3.0'); gi.require_version('AppIndicator3', '0.1')" 2>/dev/null; then
+    if ! python3 -c "
+import gi
+gi.require_version('Gtk', '3.0')
+try:
+    gi.require_version('AyatanaAppIndicator3', '0.1')
+    from gi.repository import AyatanaAppIndicator3
+except:
+    gi.require_version('AppIndicator3', '0.1')
+    from gi.repository import AppIndicator3
+" 2>/dev/null; then
         echo "❌ Не все зависимости установлены!"
-        echo "Установите их командой выше и запустите скрипт снова"
+        echo "Установите их командами выше и запустите скрипт снова"
         exit 1
     fi
 fi

@@ -24,6 +24,10 @@
 
 ```bash
 sudo apt-get update
+# Для Ubuntu 22.04+ / Debian 12+
+sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+
+# Для старых версий (если первая команда не работает)
 sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
 ```
 
