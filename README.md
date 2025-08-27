@@ -32,8 +32,8 @@ sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
 #### Для всех пользователей (рекомендуется):
 
 ```bash
-git clone https://github.com/yourusername/AntonKeyboard.git
-cd AntonKeyboard
+git clone https://github.com/B0xxxi/AntonioBoard.git
+cd AntonioBoard
 make check-deps  # Проверка зависимостей
 sudo make install
 ```
@@ -41,7 +41,7 @@ sudo make install
 #### Только для текущего пользователя:
 
 ```bash
-git clone https://github.com/yourusername/AntonKeyboard.git
+git clone https://github.com/B0xxxi/AntonioBoard.git
 cd AntonKeyboard
 make check-deps  # Проверка зависимостей
 make install-user
