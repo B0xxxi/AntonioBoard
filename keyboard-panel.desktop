@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Keyboard Panel
+Name[ru]=Языковая панель
+Comment=Keyboard layout switcher for system tray
+Comment[ru]=Переключатель раскладки клавиатуры для системного трея
+Exec=/usr/local/bin/keyboard_panel.py
+Icon=input-keyboard
+Terminal=false
+Categories=System;Utility;
+StartupNotify=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5
+X-KDE-autostart-after=panel
