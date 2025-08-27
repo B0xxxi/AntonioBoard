@@ -52,23 +52,7 @@ uninstall-user:
 
 # Проверка зависимостей
 check-deps:
-	@echo "Проверка зависимостей..."
-	@python3 -c "\
-import gi; \
-gi.require_version('Gtk', '3.0'); \
-try: \
-    gi.require_version('AyatanaAppIndicator3', '0.1'); \
-    from gi.repository import AyatanaAppIndicator3; \
-except: \
-    gi.require_version('AppIndicator3', '0.1'); \
-    from gi.repository import AppIndicator3; \
-print('Все зависимости установлены')" || \
-	(echo "Отсутствуют необходимые зависимости!"; \
-	 echo "Установите их командой:"; \
-	 echo "sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1"; \
-	 echo "Или для старых версий:"; \
-	 echo "sudo apt-get install python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1"; \
-	 exit 1)
+	@python3 check_deps.py
 
 # Тестирование (запуск без установки)
 test:
