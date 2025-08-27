@@ -56,7 +56,7 @@ check-deps:
 
 # Тестирование (запуск без установки)
 test:
-	@echo "Тестирование плагина..."
+	@echo "Testing plugin..."
 	python3 $(PYTHON_SCRIPT)
 
 # Очистка временных файлов
