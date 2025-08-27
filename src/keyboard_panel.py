@@ -26,11 +26,14 @@ import subprocess
 import os
 import sys
 import signal
+from config import Config
+from flags import get_flag_emoji, get_flag_text, get_country_name
 
 class KeyboardPanel:
     def __init__(self):
         self.current_layout = "en"
         self.layouts = self.get_available_layouts()
+        self.config = Config()
         
         # Создаем системный индикатор
         self.indicator = AppIndicator3.Indicator.new(
@@ -44,9 +47,11 @@ class KeyboardPanel:
         
         # Обновляем текущую раскладку
         self.update_current_layout()
+        self.update_indicator_display()
         
         # Устанавливаем таймер для периодического обновления
-        GLib.timeout_add_seconds(1, self.update_current_layout)
+        update_interval = self.config.get_update_interval()
+        GLib.timeout_add_seconds(update_interval, self.update_current_layout)
 
     def get_available_layouts(self):
         """Получает список доступных раскладок клавиатуры"""
@@ -99,7 +104,7 @@ class KeyboardPanel:
         menu = Gtk.Menu()
         
         # Заголовок с текущей раскладкой
-        current_item = Gtk.MenuItem(label="Текущая: {}".format(self.current_layout.upper()))
+        current_item = Gtk.MenuItem(label="Current: {}".format(self.current_layout.upper()))
         current_item.set_sensitive(False)
         menu.append(current_item)
         
@@ -110,7 +115,7 @@ class KeyboardPanel:
         # Пункты для каждой доступной раскладки
         for layout in self.layouts:
             layout_name = self.get_layout_name(layout)
-            item = Gtk.MenuItem(label="Переключить на {}".format(layout_name))
+            item = Gtk.MenuItem(label="Switch to {}".format(layout_name))
             item.connect('activate', self.on_layout_selected, layout)
             menu.append(item)
         
@@ -118,8 +123,18 @@ class KeyboardPanel:
         separator2 = Gtk.SeparatorMenuItem()
         menu.append(separator2)
         
+        # Настройки
+        settings_item = Gtk.MenuItem(label="Settings")
+        settings_submenu = self.create_settings_menu()
+        settings_item.set_submenu(settings_submenu)
+        menu.append(settings_item)
+        
+        # Разделитель
+        separator3 = Gtk.SeparatorMenuItem()
+        menu.append(separator3)
+        
         # Выход
-        quit_item = Gtk.MenuItem(label="Выход")
+        quit_item = Gtk.MenuItem(label="Quit")
         quit_item.connect('activate', self.quit)
         menu.append(quit_item)
         
@@ -143,7 +158,7 @@ class KeyboardPanel:
         """Обработчик выбора раскладки"""
         if self.set_layout(layout):
             self.current_layout = layout
-            self.update_indicator_label()
+            self.update_indicator_display()
             # Обновляем меню
             self.indicator.set_menu(self.create_menu())
 
@@ -152,14 +167,97 @@ class KeyboardPanel:
         new_layout = self.get_current_layout()
         if new_layout != self.current_layout:
             self.current_layout = new_layout
-            self.update_indicator_label()
+            self.update_indicator_display()
             # Обновляем меню при изменении раскладки
             self.indicator.set_menu(self.create_menu())
         return True  # Продолжаем таймер
 
-    def update_indicator_label(self):
-        """Обновляет отображаемый текст индикатора"""
-        self.indicator.set_label(self.current_layout.upper(), "")
+    def create_settings_menu(self):
+        """Создает меню настроек"""
+        menu = Gtk.Menu()
+        
+        # Настройки иконки
+        icon_item = Gtk.MenuItem(label="Icon type")
+        icon_submenu = Gtk.Menu()
+        
+        icon_types = [
+            ('none', 'No icon'),
+            ('keyboard', 'Keyboard'),
+            ('flag', 'Country flag')
+        ]
+        
+        current_icon_type = self.config.get_icon_type()
+        
+        for icon_type, label in icon_types:
+            item = Gtk.CheckMenuItem(label=label)
+            item.set_active(icon_type == current_icon_type)
+            item.connect('activate', self.on_icon_type_changed, icon_type)
+            icon_submenu.append(item)
+        
+        icon_item.set_submenu(icon_submenu)
+        menu.append(icon_item)
+        
+        # Настройка отображения текста
+        text_item = Gtk.CheckMenuItem(label="Show text")
+        text_item.set_active(self.config.get_show_text())
+        text_item.connect('activate', self.on_show_text_changed)
+        menu.append(text_item)
+        
+        menu.show_all()
+        return menu
+    
+    def on_icon_type_changed(self, widget, icon_type):
+        """Обработчик изменения типа иконки"""
+        if widget.get_active():
+            self.config.set_icon_type(icon_type)
+            self.update_indicator_display()
+            # Обновляем меню чтобы показать только одну активную опцию
+            self.indicator.set_menu(self.create_menu())
+    
+    def on_show_text_changed(self, widget):
+        """Обработчик изменения отображения текста"""
+        self.config.set_show_text(widget.get_active())
+        self.update_indicator_display()
+    
+    def update_indicator_display(self):
+        """Обновляет отображение индикатора (иконка и текст)"""
+        icon_type = self.config.get_icon_type()
+        show_text = self.config.get_show_text()
+        
+        # Определяем иконку
+        if icon_type == 'flag':
+            # Пробуем использовать emoji флаг
+            try:
+                icon_name = None  # Используем текст вместо иконки для флагов
+                self.indicator.set_icon_full("", "")
+            except:
+                # Fallback на стандартную иконку клавиатуры
+                self.indicator.set_icon_full("input-keyboard", "")
+        elif icon_type == 'keyboard':
+            self.indicator.set_icon_full("input-keyboard", "")
+        else:  # none
+            self.indicator.set_icon_full("", "")
+        
+        # Определяем текст
+        label_text = ""
+        if show_text:
+            if icon_type == 'flag':
+                # Показываем ASCII флаг и сокращение (избегаем emoji)
+                flag = get_flag_text(self.current_layout)
+                label_text = "{} {}".format(flag, self.current_layout.upper())
+            else:
+                # Только сокращение раскладки
+                label_text = self.current_layout.upper()
+        elif icon_type == 'flag':
+            # Только ASCII флаг без текста (избегаем emoji)
+            label_text = get_flag_text(self.current_layout)
+        
+        # Безопасное установление текста (только ASCII)
+        try:
+            self.indicator.set_label(label_text, "")
+        except UnicodeEncodeError:
+            # Fallback на простое отображение
+            self.indicator.set_label(self.current_layout.upper(), "")
 
     def quit(self, widget=None):
         """Завершает работу приложения"""
