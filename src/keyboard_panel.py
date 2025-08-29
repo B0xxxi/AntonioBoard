@@ -5,6 +5,11 @@
 """
 
 import gi
+import os
+import sys
+import subprocess
+import signal
+
 gi.require_version('Gtk', '3.0')
 
 # Determine if we're running Wayland or X11
@@ -27,10 +32,6 @@ else:
     USE_APPINDICATOR = False
 
 from gi.repository import Gtk, GObject, GLib
-import subprocess
-import os
-import sys
-import signal
 from config import Config
 from flags import get_flag_emoji, get_flag_text, get_country_name
 
