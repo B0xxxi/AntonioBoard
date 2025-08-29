@@ -7,19 +7,24 @@
 import gi
 gi.require_version('Gtk', '3.0')
 
-# Пробуем использовать AyatanaAppIndicator3 (новые версии)
-try:
-    gi.require_version('AyatanaAppIndicator3', '0.1')
-    from gi.repository import AyatanaAppIndicator3 as AppIndicator3
-except (ImportError, ValueError):
-    # Fallback на старый AppIndicator3
+# Determine if we're running Wayland or X11
+WAYLAND_MODE = bool(os.environ.get('WAYLAND_DISPLAY')) or 'wayland' in os.environ.get('XDG_SESSION_TYPE', '').lower() or 'labwc' in os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+
+if not WAYLAND_MODE:
+    # Try to use AppIndicator3 for X11
     try:
-        gi.require_version('AppIndicator3', '0.1')
-        from gi.repository import AppIndicator3
+        gi.require_version('AyatanaAppIndicator3', '0.1')
+        from gi.repository import AyatanaAppIndicator3 as AppIndicator3
+        USE_APPINDICATOR = True
     except (ImportError, ValueError):
-        print("Error: AppIndicator3 or AyatanaAppIndicator3 not found")
-        print("Install: sudo apt-get install gir1.2-ayatanaappindicator3-0.1")
-        exit(1)
+        try:
+            gi.require_version('AppIndicator3', '0.1')
+            from gi.repository import AppIndicator3
+            USE_APPINDICATOR = True
+        except (ImportError, ValueError):
+            USE_APPINDICATOR = False
+else:
+    USE_APPINDICATOR = False
 
 from gi.repository import Gtk, GObject, GLib
 import subprocess
@@ -34,22 +39,32 @@ class KeyboardPanel:
         self.current_layout = "en"
         self.layouts = self.get_available_layouts()
         self.config = Config()
+        self.indicator = None
+        self.status_icon = None
         
-        # Создаем системный индикатор
-        self.indicator = AppIndicator3.Indicator.new(
-            "keyboard-panel",
-            "input-keyboard",
-            AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
-        )
+        if USE_APPINDICATOR:
+            # Create AppIndicator for X11
+            self.indicator = AppIndicator3.Indicator.new(
+                "keyboard-panel",
+                "input-keyboard",
+                AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
+            )
+            self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+            self.indicator.set_menu(self.create_menu())
+        else:
+            # Create StatusIcon for Wayland/fallback
+            self.status_icon = Gtk.StatusIcon()
+            self.status_icon.set_from_icon_name("input-keyboard")
+            self.status_icon.set_tooltip_text("Keyboard Layout")
+            self.status_icon.connect("popup-menu", self.on_popup_menu)
+            self.status_icon.connect("activate", self.on_status_icon_activate)
+            self.status_icon.set_visible(True)
         
-        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
-        self.indicator.set_menu(self.create_menu())
-        
-        # Обновляем текущую раскладку
+        # Update current layout
         self.update_current_layout()
         self.update_indicator_display()
         
-        # Устанавливаем таймер для периодического обновления
+        # Set timer for periodic updates
         update_interval = self.config.get_update_interval()
         GLib.timeout_add_seconds(update_interval, self.update_current_layout)
 
@@ -160,7 +175,8 @@ class KeyboardPanel:
             self.current_layout = layout
             self.update_indicator_display()
             # Update menu
-            self.indicator.set_menu(self.create_menu())
+            if USE_APPINDICATOR and self.indicator:
+                self.indicator.set_menu(self.create_menu())
 
     def update_current_layout(self):
         """Updates current layout information"""
@@ -169,8 +185,29 @@ class KeyboardPanel:
             self.current_layout = new_layout
             self.update_indicator_display()
             # Update menu when layout changes
-            self.indicator.set_menu(self.create_menu())
+            if USE_APPINDICATOR and self.indicator:
+                self.indicator.set_menu(self.create_menu())
         return True  # Continue timer
+
+    def on_popup_menu(self, icon, button, time):
+        """Handle right-click on StatusIcon"""
+        menu = self.create_menu()
+        menu.popup(None, None, None, None, button, time)
+    
+    def on_status_icon_activate(self, icon):
+        """Handle left-click on StatusIcon"""
+        # Toggle between layouts if multiple available
+        if len(self.layouts) > 1:
+            current_idx = 0
+            try:
+                current_idx = self.layouts.index(self.current_layout)
+            except ValueError:
+                pass
+            next_idx = (current_idx + 1) % len(self.layouts)
+            next_layout = self.layouts[next_idx]
+            if self.set_layout(next_layout):
+                self.current_layout = next_layout
+                self.update_indicator_display()
 
     def create_settings_menu(self):
         """Creates settings menu"""
@@ -212,7 +249,8 @@ class KeyboardPanel:
             self.config.set_icon_type(icon_type)
             self.update_indicator_display()
             # Update menu to show only one active option
-            self.indicator.set_menu(self.create_menu())
+            if USE_APPINDICATOR and self.indicator:
+                self.indicator.set_menu(self.create_menu())
     
     def on_show_text_changed(self, widget):
         """Text display change handler"""
@@ -224,21 +262,7 @@ class KeyboardPanel:
         icon_type = self.config.get_icon_type()
         show_text = self.config.get_show_text()
         
-        # Determine icon
-        if icon_type == 'flag':
-            # Try to use emoji flag
-            try:
-                icon_name = None  # Use text instead of icon for flags
-                self.indicator.set_icon_full("", "")
-            except:
-                # Fallback to standard keyboard icon
-                self.indicator.set_icon_full("input-keyboard", "")
-        elif icon_type == 'keyboard':
-            self.indicator.set_icon_full("input-keyboard", "")
-        else:  # none
-            self.indicator.set_icon_full("", "")
-        
-        # Determine text
+        # Determine text for tooltip/label
         label_text = ""
         if show_text:
             if icon_type == 'flag':
@@ -251,13 +275,34 @@ class KeyboardPanel:
         elif icon_type == 'flag':
             # Only ASCII flag without text (avoid emoji)
             label_text = get_flag_text(self.current_layout)
+        else:
+            label_text = self.current_layout.upper()
         
-        # Safe text setting (ASCII only)
-        try:
-            self.indicator.set_label(label_text, "")
-        except UnicodeEncodeError:
-            # Fallback to simple display
-            self.indicator.set_label(self.current_layout.upper(), "")
+        if USE_APPINDICATOR and self.indicator:
+            # AppIndicator mode (X11)
+            if icon_type == 'flag':
+                self.indicator.set_icon_full("", "")
+            elif icon_type == 'keyboard':
+                self.indicator.set_icon_full("input-keyboard", "")
+            else:  # none
+                self.indicator.set_icon_full("", "")
+            
+            try:
+                self.indicator.set_label(label_text, "")
+            except UnicodeEncodeError:
+                self.indicator.set_label(self.current_layout.upper(), "")
+        
+        elif self.status_icon:
+            # StatusIcon mode (Wayland/fallback)
+            if icon_type == 'keyboard':
+                self.status_icon.set_from_icon_name("input-keyboard")
+            else:
+                # For flag or none, create a simple text-based display
+                self.status_icon.set_from_icon_name("input-keyboard")
+            
+            # Update tooltip with layout info
+            tooltip = "Keyboard Layout: {}".format(label_text or self.current_layout.upper())
+            self.status_icon.set_tooltip_text(tooltip)
 
     def quit(self, widget=None):
         """Terminates application"""
