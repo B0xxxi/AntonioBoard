@@ -53,13 +53,8 @@ class KeyboardPanel:
             self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
             self.indicator.set_menu(self.create_menu())
         else:
-            # Create StatusIcon for Wayland/fallback
-            self.status_icon = Gtk.StatusIcon()
-            self.status_icon.set_from_icon_name("input-keyboard")
-            self.status_icon.set_tooltip_text("Keyboard Layout")
-            self.status_icon.connect("popup-menu", self.on_popup_menu)
-            self.status_icon.connect("activate", self.on_status_icon_activate)
-            self.status_icon.set_visible(True)
+            # Create a simple window for Wayland/fallback
+            self.create_panel_window()
         
         # Update current layout
         self.update_current_layout()
@@ -68,6 +63,67 @@ class KeyboardPanel:
         # Set timer for periodic updates
         update_interval = self.config.get_update_interval()
         GLib.timeout_add_seconds(update_interval, self.update_current_layout)
+
+    def create_panel_window(self):
+        """Create a simple panel window for Wayland"""
+        self.window = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+        self.window.set_title("Keyboard Panel")
+        self.window.set_default_size(80, 30)
+        self.window.set_resizable(False)
+        self.window.set_decorated(False)
+        self.window.set_skip_taskbar_hint(True)
+        self.window.set_skip_pager_hint(True)
+        self.window.set_keep_above(True)
+        self.window.set_type_hint(3)  # DOCK type
+        
+        # Position at top-right corner
+        self.window.move(1800, 10)
+        
+        # Create layout button
+        self.layout_button = Gtk.Button()
+        self.layout_button.set_relief(Gtk.ReliefStyle.NONE)
+        self.layout_button.connect("button-press-event", self.on_button_press)
+        
+        # Create horizontal box for icon and text
+        self.button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        
+        # Icon
+        self.icon_image = Gtk.Image()
+        self.icon_image.set_from_icon_name("input-keyboard", Gtk.IconSize.SMALL_TOOLBAR)
+        self.button_box.pack_start(self.icon_image, False, False, 0)
+        
+        # Text label
+        self.text_label = Gtk.Label()
+        self.text_label.set_text("EN")
+        self.button_box.pack_start(self.text_label, False, False, 0)
+        
+        self.layout_button.add(self.button_box)
+        self.window.add(self.layout_button)
+        
+        # Set window style
+        style_provider = Gtk.CssProvider()
+        css = """
+        window {
+            background: rgba(50, 50, 50, 0.9);
+            border-radius: 5px;
+            border: 1px solid #666;
+        }
+        button {
+            background: transparent;
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 3px 6px;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        """
+        style_provider.load_from_data(css.encode())
+        self.window.get_style_context().add_provider(style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.layout_button.get_style_context().add_provider(style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        
+        self.window.show_all()
 
     def get_available_layouts(self):
         """Получает список доступных раскладок клавиатуры"""
@@ -190,6 +246,15 @@ class KeyboardPanel:
                 self.indicator.set_menu(self.create_menu())
         return True  # Continue timer
 
+    def on_button_press(self, widget, event):
+        """Handle button press on panel window"""
+        if event.button == 1:  # Left click
+            self.on_status_icon_activate(None)
+        elif event.button == 3:  # Right click
+            menu = self.create_menu()
+            menu.popup(None, None, None, None, event.button, event.time)
+        return True
+
     def on_popup_menu(self, icon, button, time):
         """Handle right-click on StatusIcon"""
         menu = self.create_menu()
@@ -293,17 +358,37 @@ class KeyboardPanel:
             except UnicodeEncodeError:
                 self.indicator.set_label(self.current_layout.upper(), "")
         
-        elif self.status_icon:
-            # StatusIcon mode (Wayland/fallback)
-            if icon_type == 'keyboard':
-                self.status_icon.set_from_icon_name("input-keyboard")
-            else:
-                # For flag or none, create a simple text-based display
-                self.status_icon.set_from_icon_name("input-keyboard")
-            
-            # Update tooltip with layout info
-            tooltip = "Keyboard Layout: {}".format(label_text or self.current_layout.upper())
-            self.status_icon.set_tooltip_text(tooltip)
+        elif hasattr(self, 'window'):
+            # Panel window mode (Wayland/fallback)
+            if hasattr(self, 'icon_image') and hasattr(self, 'text_label'):
+                # Update icon
+                if icon_type == 'keyboard':
+                    self.icon_image.set_from_icon_name("input-keyboard", Gtk.IconSize.SMALL_TOOLBAR)
+                    self.icon_image.show()
+                elif icon_type == 'none':
+                    self.icon_image.hide()
+                else:  # flag
+                    self.icon_image.hide()
+                
+                # Update text
+                if show_text:
+                    if icon_type == 'flag':
+                        flag = get_flag_text(self.current_layout)
+                        self.text_label.set_text("{} {}".format(flag, self.current_layout.upper()))
+                    else:
+                        self.text_label.set_text(self.current_layout.upper())
+                    self.text_label.show()
+                elif icon_type == 'flag':
+                    flag = get_flag_text(self.current_layout)
+                    self.text_label.set_text(flag)
+                    self.text_label.show()
+                else:
+                    if icon_type == 'none':
+                        # Show layout text even if "show text" is off when no icon
+                        self.text_label.set_text(self.current_layout.upper())
+                        self.text_label.show()
+                    else:
+                        self.text_label.hide()
 
     def quit(self, widget=None):
         """Terminates application"""
