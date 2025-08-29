@@ -80,6 +80,10 @@ clean:
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} +
 
+# Полная переустановка
+reinstall: uninstall install
+	@echo "Полная переустановка завершена!"
+
 # Справка
 help:
 	@echo "Доступные команды:"
@@ -87,6 +91,7 @@ help:
 	@echo "  make install-user   - Установка для текущего пользователя"
 	@echo "  make uninstall      - Удаление системной установки"
 	@echo "  make uninstall-user - Удаление пользовательской установки"
+	@echo "  make reinstall      - Полная переустановка (uninstall + install)"
 	@echo "  make check-deps     - Проверка зависимостей"
 	@echo "  make test          - Тестирование без установки"
 	@echo "  make clean         - Очистка временных файлов"

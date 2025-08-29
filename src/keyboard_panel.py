@@ -17,8 +17,8 @@ except (ImportError, ValueError):
         gi.require_version('AppIndicator3', '0.1')
         from gi.repository import AppIndicator3
     except (ImportError, ValueError):
-        print("Ошибка: не найден AppIndicator3 или AyatanaAppIndicator3")
-        print("Установите: sudo apt-get install gir1.2-ayatanaappindicator3-0.1")
+        print("Error: AppIndicator3 or AyatanaAppIndicator3 not found")
+        print("Install: sudo apt-get install gir1.2-ayatanaappindicator3-0.1")
         exit(1)
 
 from gi.repository import Gtk, GObject, GLib
@@ -142,41 +142,41 @@ class KeyboardPanel:
         return menu
 
     def get_layout_name(self, layout):
-        """Возвращает читаемое имя раскладки"""
+        """Returns readable layout name"""
         layout_names = {
-            'us': 'Английский (US)',
-            'ru': 'Русский',
-            'en': 'Английский',
-            'de': 'Немецкий',
-            'fr': 'Французский',
-            'es': 'Испанский',
-            'it': 'Итальянский'
+            'us': 'English (US)',
+            'ru': 'Russian',
+            'en': 'English',
+            'de': 'German',
+            'fr': 'French',
+            'es': 'Spanish',
+            'it': 'Italian'
         }
         return layout_names.get(layout, layout.upper())
 
     def on_layout_selected(self, widget, layout):
-        """Обработчик выбора раскладки"""
+        """Layout selection handler"""
         if self.set_layout(layout):
             self.current_layout = layout
             self.update_indicator_display()
-            # Обновляем меню
+            # Update menu
             self.indicator.set_menu(self.create_menu())
 
     def update_current_layout(self):
-        """Обновляет информацию о текущей раскладке"""
+        """Updates current layout information"""
         new_layout = self.get_current_layout()
         if new_layout != self.current_layout:
             self.current_layout = new_layout
             self.update_indicator_display()
-            # Обновляем меню при изменении раскладки
+            # Update menu when layout changes
             self.indicator.set_menu(self.create_menu())
-        return True  # Продолжаем таймер
+        return True  # Continue timer
 
     def create_settings_menu(self):
-        """Создает меню настроек"""
+        """Creates settings menu"""
         menu = Gtk.Menu()
         
-        # Настройки иконки
+        # Icon settings
         icon_item = Gtk.MenuItem(label="Icon type")
         icon_submenu = Gtk.Menu()
         
@@ -197,7 +197,7 @@ class KeyboardPanel:
         icon_item.set_submenu(icon_submenu)
         menu.append(icon_item)
         
-        # Настройка отображения текста
+        # Text display setting
         text_item = Gtk.CheckMenuItem(label="Show text")
         text_item.set_active(self.config.get_show_text())
         text_item.connect('activate', self.on_show_text_changed)
@@ -207,65 +207,65 @@ class KeyboardPanel:
         return menu
     
     def on_icon_type_changed(self, widget, icon_type):
-        """Обработчик изменения типа иконки"""
+        """Icon type change handler"""
         if widget.get_active():
             self.config.set_icon_type(icon_type)
             self.update_indicator_display()
-            # Обновляем меню чтобы показать только одну активную опцию
+            # Update menu to show only one active option
             self.indicator.set_menu(self.create_menu())
     
     def on_show_text_changed(self, widget):
-        """Обработчик изменения отображения текста"""
+        """Text display change handler"""
         self.config.set_show_text(widget.get_active())
         self.update_indicator_display()
     
     def update_indicator_display(self):
-        """Обновляет отображение индикатора (иконка и текст)"""
+        """Updates indicator display (icon and text)"""
         icon_type = self.config.get_icon_type()
         show_text = self.config.get_show_text()
         
-        # Определяем иконку
+        # Determine icon
         if icon_type == 'flag':
-            # Пробуем использовать emoji флаг
+            # Try to use emoji flag
             try:
-                icon_name = None  # Используем текст вместо иконки для флагов
+                icon_name = None  # Use text instead of icon for flags
                 self.indicator.set_icon_full("", "")
             except:
-                # Fallback на стандартную иконку клавиатуры
+                # Fallback to standard keyboard icon
                 self.indicator.set_icon_full("input-keyboard", "")
         elif icon_type == 'keyboard':
             self.indicator.set_icon_full("input-keyboard", "")
         else:  # none
             self.indicator.set_icon_full("", "")
         
-        # Определяем текст
+        # Determine text
         label_text = ""
         if show_text:
             if icon_type == 'flag':
-                # Показываем ASCII флаг и сокращение (избегаем emoji)
+                # Show ASCII flag and abbreviation (avoid emoji)
                 flag = get_flag_text(self.current_layout)
                 label_text = "{} {}".format(flag, self.current_layout.upper())
             else:
-                # Только сокращение раскладки
+                # Only layout abbreviation
                 label_text = self.current_layout.upper()
         elif icon_type == 'flag':
-            # Только ASCII флаг без текста (избегаем emoji)
+            # Only ASCII flag without text (avoid emoji)
             label_text = get_flag_text(self.current_layout)
         
-        # Безопасное установление текста (только ASCII)
+        # Safe text setting (ASCII only)
         try:
             self.indicator.set_label(label_text, "")
         except UnicodeEncodeError:
-            # Fallback на простое отображение
+            # Fallback to simple display
             self.indicator.set_label(self.current_layout.upper(), "")
 
     def quit(self, widget=None):
-        """Завершает работу приложения"""
+        """Terminates application"""
         Gtk.main_quit()
 
     def run(self):
-        """Запускает главный цикл приложения"""
-        # Обработка сигнала завершения
+        """Starts main application loop"""
+        # Signal handling
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, lambda signum, frame: self.quit())
         
@@ -275,25 +275,25 @@ class KeyboardPanel:
             self.quit()
 
 def main():
-    """Точка входа в приложение"""
+    """Application entry point"""
     if len(sys.argv) > 1 and sys.argv[1] == '--help':
-        print("Плагин языковой панели для панели задач Raspberry Pi OS")
-        print("Использование: keyboard_panel.py")
+        print("Keyboard panel plugin for Raspberry Pi OS taskbar")
+        print("Usage: keyboard_panel.py")
         print("")
-        print("Показывает текущую раскладку клавиатуры в системном трее")
-        print("и позволяет переключать языки через контекстное меню.")
+        print("Shows current keyboard layout in system tray")
+        print("and allows switching languages via context menu.")
         return
 
-    # Проверяем, что запущена графическая среда
+    # Check if graphics environment is running
     if not os.environ.get('DISPLAY'):
-        print("Ошибка: Не найдена графическая среда (DISPLAY не установлен)")
+        print("Error: No graphics environment found (DISPLAY not set)")
         sys.exit(1)
 
     try:
         panel = KeyboardPanel()
         panel.run()
     except Exception as e:
-        print("Ошибка при запуске: {}".format(e))
+        print("Startup error: {}".format(e))
         sys.exit(1)
 
 if __name__ == '__main__':
